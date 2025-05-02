@@ -1,0 +1,83 @@
+---
+title: "re_tidy"
+author: "Emma Biland"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(here)
+
+
+df <- readr::read_csv(here::here("data", "database_s1_cleaned.csv"))
+
+df <- tidyr::fill(df, experiment, .direction = "down")
+```
+
+## 1. Computation of the log-response ratio
+
+The **log-response ratio** measures the effect of the CO$_2$-enriched treatment on soil organic carbon, comparing means under elevated vs ambient CO$_2$ :
+
+\[
+RR = \ln\left(\frac{\text{mean\_increased\_CO$_2$}}{\text{mean\_ambient\_CO$_2$}}\right)
+\]
+
+```{r log-ratio}
+df <- dplyr::mutate(df,
+  mean_ambient_CO2   = as.numeric(mean_ambient_CO2),
+  mean_increased_CO2 = as.numeric(mean_increased_CO2),
+  time_years         = as.numeric(time_years),
+  log_response_ratio = log(mean_increased_CO2 / mean_ambient_CO2)
+)
+```
+
+## 2. Classification of time periods
+
+There are 3 phases:
+- *early*: less than 3 years since the start of the experiment
+- *mid*: between 3 and 6 years
+- *late*: more than 6 years
+
+```{r phases}
+df <- dplyr::mutate(df,
+  phase = dplyr::case_when(
+    time_years < 3 ~ "early",
+    time_years >= 3 & time_years <= 6 ~ "mid",
+    time_years > 6 ~ "late"
+  )
+)
+```
+
+## 3. Average log-response ratios by experiment and phase
+
+Log-response ratios are averaged **after being computed for each observation**:
+
+```{r aggregation}
+summary_df <- df %>%
+  dplyr::group_by(experiment, phase) %>%
+  dplyr::summarise(
+    mean_log_rr = mean(log_response_ratio, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+## 4. Results in table format
+
+```{r table}
+knitr::kable(summary_df, digits = 3, caption = "Mean log-response ratio by experiment and phase")
+```
+## 5. Reflection on the results
+
+The dataset used in this analysis combines data from over 30 CO$_2$ enrichment experiments (FACE and OTC) conducted in diverse ecosystems, including croplands, forests, and grasslands. For each experiment, the dataset reports the mean soil organic carbon (SOC) measured under ambient and elevated CO$_2$ conditions, along with metadata such as time since the beginning of the experiment, treatment details (e.g. nitrogen addition, irrigation), and sample depth. After restructuring the data into tidy format, we computed a log-response ratio for each observation, representing the relative change in SOC under elevated CO$_2$ compared to ambient conditions.
+
+We expected that elevated CO$_2$ would enhance SOC due to increased plant productivity and greater carbon input into soils, particularly in the early and mid phases of the experiments. Therefore, we hypothesized that the log-response ratios would generally be positive.
+
+The results confirm this expectation for some experiments, such as *China OTC - high N*, *SwissFACE - clover - high N*, and *New Zealand OTC - N. fusca*, where SOC increased substantially under elevated CO$_2$. However, many other experiments showed neutral or even negative log-response ratios, including *POPFACE - nigra* and *SoyFACE*. When grouping results by time phase, early and mid periods tend to show slightly more positive effects, but with substantial variability. Late-phase responses are less consistent and often close to zero or negative, suggesting that SOC accumulation may slow down or even reverse over time.
+
+Overall, these findings partly support the initial hypothesis but also highlight the complexity of SOC dynamics. The variation in outcomes reflects differences across experimental sites, treatments, and environmental conditions. This reinforces the importance, as discussed in class, of considering multiple interacting dimensions — such as time, treatment, and location — when interpreting ecological responses. Thanks to the tidy data structure, we were able to compute the log-response ratio for each observation and only then aggregate the results, preserving the granularity and avoiding misleading conclusions that could result from premature averaging.
