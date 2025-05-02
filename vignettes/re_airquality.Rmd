@@ -1,0 +1,92 @@
+---
+title: "re_airquality"
+author: "Emma Biland"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(knitr)
+
+df <- datasets::airquality
+```
+
+## 1. Dataset description
+
+The `airquality` dataset provides daily air quality measurements in New York City from May to September 1973. The main variable of interest is **Ozone** (ppb). Other variables include **Solar.R** (solar radiation in Langley), **Wind** (mph), **Temp** (Fahrenheit), and the **Month** and **Day** of the observation. Some values are missing (e.g. Ozone and Solar.R).
+
+```{r preview}
+knitr::kable(utils::head(df, 6), caption = "First six rows of the airquality dataset")
+```
+
+## 2. Research question
+
+> **How does temperature influence ozone concentration, and are there seasonal (monthly) patterns in ozone levels?**
+
+## 3. Statistical metrics
+
+We begin by computing a few summary statistics to better understand the key variables.
+
+```{r summary-metrics}
+df_clean <- dplyr::filter(df, !is.na(Ozone), !is.na(Temp))
+
+summary_stats <- dplyr::summarise(
+  df_clean,
+  mean_ozone = round(mean(Ozone), 1),
+  max_ozone = max(Ozone),
+  min_ozone = min(Ozone),
+  mean_temp = round(mean(Temp), 1),
+  n = dplyr::n()
+)
+
+knitr::kable(summary_stats, caption = "Basic statistics on Ozone and Temperature")
+```
+
+## 4. Figures and patterns
+
+### a) Ozone concentration by month
+
+```{r boxplot-month}
+ggplot2::ggplot(df, ggplot2::aes(x = factor(Month), y = Ozone)) +
+  ggplot2::geom_boxplot(fill = "#FFCC80", color = "#FF6F00", na.rm = TRUE) +
+  ggplot2::labs(title = "Monthly distribution of ozone concentration",
+                x = "Month (May to September)", y = "Ozone (ppb)") +
+  ggplot2::theme_minimal()
+```
+
+### b) Temperature vs Ozone (scatterplot)
+
+```{r scatter-temp-ozone}
+ggplot2::ggplot(df_clean, ggplot2::aes(x = Temp, y = Ozone)) +
+  ggplot2::geom_point(color = "#1565C0", alpha = 0.7) +
+  ggplot2::geom_smooth(method = "lm", se = FALSE, color = "darkred") +
+  ggplot2::labs(title = "Relationship between temperature and ozone",
+                x = "Temperature (°F)", y = "Ozone (ppb)") +
+  ggplot2::theme_light()
+```
+
+### c) Temporal trend in Ozone (by date)
+
+```{r ozone-time-series}
+df_date <- df %>%
+  dplyr::filter(!is.na(Ozone)) %>%
+  dplyr::mutate(date = base::as.Date(paste(1973, Month, Day, sep = "-")))
+
+ggplot2::ggplot(df_date, ggplot2::aes(x = date, y = Ozone)) +
+  ggplot2::geom_line(color = "#43A047") +
+  ggplot2::labs(title = "Ozone concentration over time",
+                x = "Date", y = "Ozone (ppb)") +
+  ggplot2::theme_minimal()
+```
+
+## 5. Interpretation and conclusion
+
+We observed that ozone concentration varies strongly between months, with the highest levels in July and August. A clear positive correlation is visible between temperature and ozone, suggesting that warmer days tend to have higher ozone levels — a pattern consistent with known photochemical processes.
+
+Over time, ozone values show a noisy but slightly increasing trend toward midsummer. These results support the idea that temperature is a strong predictor of ozone, and that seasonality plays a significant role in air quality patterns.
+
+Further exploration could include multivariate models controlling for solar radiation and wind speed to better isolate temperature effects.
