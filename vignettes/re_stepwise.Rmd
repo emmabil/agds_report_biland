@@ -1,0 +1,112 @@
+---
+title: "re_stepwise"
+author: "Emma Biland"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(readr)
+library(purrr)
+
+df <- readr::read_csv(here::here("data", "datahalf_hourly_fluxes.csv"))
+
+df <- df %>%
+  dplyr::select(GPP_NT_VUT_REF, TA_F, VPD_F, PPFD_IN, SW_IN_F_MDS, Tair = TA_F, CO2 = CO2_F_MDS) %>%
+  dplyr::filter(!is.na(GPP_NT_VUT_REF)) %>%
+  tidyr::drop_na()
+
+```
+
+## 1. Evaluation of all bivariate models
+
+We start by fitting all simple linear models with GPP as the response and each predictor alone.
+
+```{r bivariate-models}
+predictors <- setdiff(names(df), "GPP_NT_VUT_REF")
+
+bivariate_models <- purrr::map_dfr(predictors, function(var) {
+  model <- lm(paste("GPP_NT_VUT_REF ~", var), data = df)
+  tibble::tibble(
+    predictor = var,
+    r_squared = summary(model)$r.squared
+  )
+}) %>%
+  dplyr::arrange(desc(r_squared))
+
+knitr::kable(bivariate_models, digits = 3, caption = "R² values for all bivariate models")
+```
+
+```{r barplot-bivariate}
+ggplot2::ggplot(bivariate_models, ggplot2::aes(x = reorder(predictor, r_squared), y = r_squared)) +
+  ggplot2::geom_col(fill = "#64b5f6") +
+  ggplot2::coord_flip() +
+  ggplot2::labs(title = "R² of bivariate models", x = "Predictor", y = "R²") +
+  ggplot2::theme_minimal()
+```
+
+## 2. Stepwise forward selection using R²
+
+We implement a custom algorithm that starts with the best univariate model and iteratively adds the variable that improves R² the most.
+
+```{r stepwise-function}
+stepwise_forward_r2 <- function(data, response, predictors) {
+  remaining <- predictors
+  selected <- c()
+  current_r2 <- 0
+  steps <- list()
+
+  while (length(remaining) > 0) {
+    r2_results <- purrr::map_dfr(remaining, function(var) {
+      formula <- as.formula(paste(response, "~", paste(c(selected, var), collapse = " + ")))
+      model <- lm(formula, data = data)
+      tibble::tibble(var = var, r_squared = summary(model)$r.squared)
+    })
+
+    best <- r2_results %>% dplyr::arrange(desc(r_squared)) %>% dplyr::slice(1)
+
+    if (best$r_squared > current_r2 + 0.01) {
+      selected <- c(selected, best$var)
+      remaining <- setdiff(remaining, best$var)
+      current_r2 <- best$r_squared
+      steps[[length(steps) + 1]] <- list(vars = selected, r2 = current_r2)
+    } else {
+      break
+    }
+  }
+
+  tibble::tibble(step = seq_along(steps),
+                 predictors = purrr::map_chr(steps, ~ paste(.x$vars, collapse = " + ")),
+                 r_squared = purrr::map_dbl(steps, ~ .x$r2))
+}
+```
+
+```{r run-stepwise}
+stepwise_results <- stepwise_forward_r2(df, "GPP_NT_VUT_REF", predictors)
+knitr::kable(stepwise_results, caption = "Stepwise forward selection steps (R²)")
+```
+
+## 3. Final model diagnostics
+
+```{r final-model}
+final_formula <- as.formula(paste("GPP_NT_VUT_REF ~", stepwise_results$predictors[nrow(stepwise_results)]))
+final_model <- lm(final_formula, data = df)
+
+summary(final_model)
+```
+
+## 4. Interpretation
+
+The stepwise selection process retained the following predictors:
+
+- `r paste(stepwise_results$predictors[nrow(stepwise_results)], collapse = ", ")`
+
+The model explains `r round(stepwise_results$r_squared[nrow(stepwise_results)] * 100, 1)`% of the variance in GPP, which is substantial. The first variable added (according to the bivariate R² values) likely had the strongest relationship with GPP. Additional variables added smaller improvements, with a +0.01 R² gain threshold required to include them.
+
+This simplified forward selection gives insight into which environmental factors most influence GPP under the conditions measured.
+
