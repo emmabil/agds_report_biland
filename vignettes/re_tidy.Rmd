@@ -1,5 +1,5 @@
 ---
-title: "re_tidy"
+title: "Report Exercise Chapter 4"
 author: "Emma Biland"
 date: "`r Sys.Date()`"
 output:
