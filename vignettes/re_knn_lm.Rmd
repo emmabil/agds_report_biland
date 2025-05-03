@@ -1,0 +1,107 @@
+---
+title: "Report Exercise Chapter 10"
+author: "Emma Biland"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(caret)
+library(recipes)
+library(rsample)
+library(yardstick)
+library(scales)
+library(here)
+```
+
+## 1. Data and model setup
+
+```{r data-prep}
+df <- read_csv(here::here("data", "datahalf_hourly_fluxes.csv")) |>
+  select(GPP_NT_VUT_REF, PPFD_IN, TA_F, VPD_F, SW_IN_F_MDS, CO2_F_MDS) |>
+  drop_na()
+
+set.seed(123)
+split <- initial_split(df, prop = 0.8)
+train <- training(split)
+test <- testing(split)
+
+rec <- recipe(GPP_NT_VUT_REF ~ ., data = train) |>
+  step_center(all_predictors()) |>
+  step_scale(all_predictors())
+```
+
+## 2. Linear regression vs KNN (k = 10)
+
+```{r model-fit}
+mod_lm <- train(rec, data = train, method = "lm")
+
+mod_knn <- train(rec, data = train, method = "knn",
+                 tuneGrid = data.frame(k = 10))
+```
+
+```{r eval-metrics}
+preds <- tibble(
+  obs = test$GPP_NT_VUT_REF,
+  lm = predict(mod_lm, test),
+  knn = predict(mod_knn, test)
+)
+
+metrics_lm  <- metrics(preds, truth = obs, estimate = lm)
+metrics_knn <- metrics(preds, truth = obs, estimate = knn)
+
+bind_rows(linear_model = metrics_lm, knn_model = metrics_knn)
+```
+
+## 3. Bias-variance trade-off
+
+KNN has low bias but high variance, making it prone to overfitting, especially with small k.  
+Linear regression is more stable due to its high bias but generalises better when the true relationship is approximately linear.
+
+## 4. Predictions visualisation
+
+```{r plot-preds, fig.width=8, fig.height=4}
+preds$index <- 1:nrow(preds)
+
+ggplot(preds, aes(x = index)) +
+  geom_point(aes(y = obs, color = "Observed"), size = 0.5) +
+  geom_line(aes(y = lm, color = "Linear"), linewidth = 0.6) +
+  geom_line(aes(y = knn, color = "KNN"), linewidth = 0.6) +
+  scale_color_manual(values = c("Observed" = "black", "Linear" = "red", "KNN" = "blue")) +
+  labs(title = "GPP Prediction Comparison", y = "GPP", x = "Index", color = "Legend") +
+  theme_minimal()
+```
+
+## 5. Impact of k on model performance
+
+```{r sweep-k}
+k_vals <- 1:40
+results <- lapply(k_vals, function(k) {
+  mod_k <- train(rec, data = train, method = "knn",
+                 tuneGrid = data.frame(k = k))
+  pred <- predict(mod_k, test)
+  tibble(k = k,
+         RMSE = rmse_vec(test$GPP_NT_VUT_REF, pred),
+         R2   = rsq_vec(test$GPP_NT_VUT_REF, pred))
+}) |> bind_rows()
+
+ggplot(results, aes(x = k)) +
+  geom_line(aes(y = RMSE), color = "darkgreen") +
+  geom_point(aes(y = RMSE)) +
+  labs(title = "RMSE vs. k (KNN)", x = "k", y = "RMSE") +
+  theme_minimal()
+```
+
+## 6. Conclusion
+
+- The KNN model adapts better to non-linear relationships but may overfit with small *k*.
+- Linear regression generalises better but can't capture complex patterns.
+- Optimal *k* values for this dataset seem to fall between 8 and 15 based on RMSE.
+
