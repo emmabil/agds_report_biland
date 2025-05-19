@@ -25,7 +25,7 @@ df <- tidyr::fill(df, experiment, .direction = "down")
 The **log-response ratio** measures the effect of the CO$_2$-enriched treatment on soil organic carbon, comparing means under elevated vs ambient CO$_2$ :
 
 \[
-RR = \ln\left(\frac{\text{mean\_increased\_CO$_2$}}{\text{mean\_ambient\_CO$_2$}}\right)
+RR = \ln\left(\frac{x_{\text{elevated}}}{x_{\text{ambient}}}\right)
 \]
 
 ```{r log-ratio}
@@ -78,6 +78,6 @@ The dataset used in this analysis combines data from over 30 CO$_2$ enrichment e
 
 We expected that elevated CO$_2$ would enhance SOC due to increased plant productivity and greater carbon input into soils, particularly in the early and mid phases of the experiments. Therefore, we hypothesized that the log-response ratios would generally be positive.
 
-The results confirm this expectation for some experiments, such as *China OTC - high N*, *SwissFACE - clover - high N*, and *New Zealand OTC - N. fusca*, where SOC increased substantially under elevated CO$_2$. However, many other experiments showed neutral or even negative log-response ratios, including *POPFACE - nigra* and *SoyFACE*. When grouping results by time phase, early and mid periods tend to show slightly more positive effects, but with substantial variability. Late-phase responses are less consistent and often close to zero or negative, suggesting that SOC accumulation may slow down or even reverse over time.
+The results confirm this expectation for some experiments, such as China OTC - high N, SwissFACE - clover - high N, and New Zealand OTC - N. fusca, where SOC increased substantially under elevated CO$_2$. However, many other experiments showed neutral or even negative log-response ratios, including POPFACE - nigra and SoyFACE. When grouping results by time phase, early and mid periods tend to show slightly more positive effects, but with substantial variability. Late-phase responses are less consistent and often close to zero or negative, suggesting that SOC accumulation may slow down or even reverse over time.
 
 Overall, these findings partly support the initial hypothesis but also highlight the complexity of SOC dynamics. The variation in outcomes reflects differences across experimental sites, treatments, and environmental conditions. This reinforces the importance, as discussed in class, of considering multiple interacting dimensions — such as time, treatment, and location — when interpreting ecological responses. Thanks to the tidy data structure, we were able to compute the log-response ratio for each observation and only then aggregate the results, preserving the granularity and avoiding misleading conclusions that could result from premature averaging.
