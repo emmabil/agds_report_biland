@@ -11,7 +11,7 @@
 
 <meta name="author" content="Emma Biland" />
 
-<meta name="date" content="2025-05-02" />
+<meta name="date" content="2025-05-19" />
 
 <title>Report Exercise Chapter 4</title>
 
@@ -350,21 +350,19 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">re_tidy</h1>
+<h1 class="title toc-ignore">Report Exercise Chapter 4</h1>
 <h4 class="author">Emma Biland</h4>
-<h4 class="date">2025-05-02</h4>
+<h4 class="date">2025-05-19</h4>
 
 </div>
 
 
 <div id="computation-of-the-log-response-ratio" class="section level2">
 <h2>1. Computation of the log-response ratio</h2>
-<p>The <strong>log-response ratio</strong> measures the effect of the
-CO<span class="math inline">\(_2\)</span>-enriched treatment on soil
-organic carbon, comparing means under elevated vs ambient CO<span class="math inline">\(_2\)</span> :</p>
+<p>The log-response ratio measures the effect of the CO<span class="math inline">\(_2\)</span>-enriched treatment on soil organic
+carbon, comparing means under elevated vs ambient CO<span class="math inline">\(_2\)</span> :</p>
 <p><span class="math display">\[
-RR =
-\ln\left(\frac{\text{mean\_increased\_CO$_2$}}{\text{mean\_ambient\_CO$_2$}}\right)
+RR = \ln\left(\frac{x_{\text{elevated}}}{x_{\text{ambient}}}\right)
 \]</span></p>
 <pre class="r"><code>df &lt;- dplyr::mutate(df,
   mean_ambient_CO2   = as.numeric(mean_ambient_CO2),
@@ -976,15 +974,14 @@ input into soils, particularly in the early and mid phases of the
 experiments. Therefore, we hypothesized that the log-response ratios
 would generally be positive.</p>
 <p>The results confirm this expectation for some experiments, such as
-<em>China OTC - high N</em>, <em>SwissFACE - clover - high N</em>, and
-<em>New Zealand OTC - N. fusca</em>, where SOC increased substantially
-under elevated CO<span class="math inline">\(_2\)</span>. However, many
-other experiments showed neutral or even negative log-response ratios,
-including <em>POPFACE - nigra</em> and <em>SoyFACE</em>. When grouping
-results by time phase, early and mid periods tend to show slightly more
-positive effects, but with substantial variability. Late-phase responses
-are less consistent and often close to zero or negative, suggesting that
-SOC accumulation may slow down or even reverse over time.</p>
+China OTC - high N, SwissFACE - clover - high N, and New Zealand OTC -
+N. fusca, where SOC increased substantially under elevated CO<span class="math inline">\(_2\)</span>. However, many other experiments
+showed neutral or even negative log-response ratios, including POPFACE -
+nigra and SoyFACE. When grouping results by time phase, early and mid
+periods tend to show slightly more positive effects, but with
+substantial variability. Late-phase responses are less consistent and
+often close to zero or negative, suggesting that SOC accumulation may
+slow down or even reverse over time.</p>
 <p>Overall, these findings partly support the initial hypothesis but
 also highlight the complexity of SOC dynamics. The variation in outcomes
 reflects differences across experimental sites, treatments, and
