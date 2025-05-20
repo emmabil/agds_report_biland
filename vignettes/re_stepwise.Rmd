@@ -3,8 +3,8 @@ title: "Report Exercise Chapter 9"
 author: "Emma Biland"
 date: "`r Sys.Date()`"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -14,12 +14,9 @@ library(ggplot2)
 library(readr)
 library(purrr)
 
-df <- readr::read_csv(here::here("data", "datahalf_hourly_fluxes.csv"))
+df <- readr::read_csv(here::here("data", "datahalf_hourly_fluxes.csv")) %>%
+  dplyr::filter(!is.na(GPP_NT_VUT_REF))
 
-df <- df %>%
-  dplyr::select(GPP_NT_VUT_REF, TA_F, VPD_F, PPFD_IN, SW_IN_F_MDS, Tair = TA_F, CO2 = CO2_F_MDS) %>%
-  dplyr::filter(!is.na(GPP_NT_VUT_REF)) %>%
-  tidyr::drop_na()
 
 ```
 
@@ -44,11 +41,14 @@ knitr::kable(bivariate_models, digits = 3, caption = "R² values for all bivaria
 
 ```{r barplot-bivariate}
 ggplot2::ggplot(bivariate_models, ggplot2::aes(x = reorder(predictor, r_squared), y = r_squared)) +
-  ggplot2::geom_col(fill = "#64b5f6") +
+  ggplot2::geom_col(fill = "indianred3") +
   ggplot2::coord_flip() +
   ggplot2::labs(title = "R² of bivariate models", x = "Predictor", y = "R²") +
   ggplot2::theme_minimal()
 ```
+
+The strongest bivariate relationship with GPP is observed for `PPFD_IN` (R² = 0.452), highlighting the importance of light availability. Several other predictors, such as `PA_F` or `USTAR`, have negligible explanatory power, confirming that not all environmental variables directly affect GPP in a linear fashion.
+
 
 ## 2. Stepwise forward selection using R²
 
@@ -90,6 +90,20 @@ stepwise_forward_r2 <- function(data, response, predictors) {
 stepwise_results <- stepwise_forward_r2(df, "GPP_NT_VUT_REF", predictors)
 knitr::kable(stepwise_results, caption = "Stepwise forward selection steps (R²)")
 ```
+```{r visualisation}
+ggplot2::ggplot(stepwise_results, ggplot2::aes(x = step, y = r_squared)) +
+  ggplot2::geom_line(color = "indianred2", linewidth = 1) +
+  ggplot2::geom_point(color = "indianred4", size = 3) +
+  ggplot2::labs(
+    title = "Stepwise Forward Selection – R² progression",
+    x = "Step (number of predictors included)",
+    y = "Cumulative R²"
+  ) +
+  ggplot2::theme_minimal()
+
+```
+
+The plot shows a rapid initial increase in R², especially after adding the first predictor `PPFD_IN` Additional variables improve the model more moderately. The process stops automatically when no remaining variable improves R² by more than 0.01. This illustrates how stepwise selection identifies a compact subset of informative predictors.
 
 ## 3. Final model diagnostics
 
@@ -107,6 +121,8 @@ The stepwise selection process retained the following predictors:
 - `r paste(stepwise_results$predictors[nrow(stepwise_results)], collapse = ", ")`
 
 The model explains `r round(stepwise_results$r_squared[nrow(stepwise_results)] * 100, 1)`% of the variance in GPP, which is substantial. The first variable added (according to the bivariate R² values) likely had the strongest relationship with GPP. Additional variables added smaller improvements, with a +0.01 R² gain threshold required to include them.
+Some variables with high bivariate R², such as `SW_IN_F`, were not included in the final model. This may be due to their strong correlation with already selected predictors (e.g., `PPFD_IN`), which capture overlapping variance. Other variables, such as `PA_F`, `P_F`, or `USTAR`, were excluded because they contributed little explanatory power, either due to weak relationships with GPP or high noise.
+
 
 This simplified forward selection gives insight into which environmental factors most influence GPP under the conditions measured.
 
