@@ -3,8 +3,8 @@ title: "Report Exercise Chapter 5"
 author: "Emma Biland"
 date: "`r Sys.Date()`"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -17,7 +17,7 @@ df <- datasets::airquality
 
 ## 1. Dataset description
 
-The `airquality` dataset provides daily air quality measurements in New York City from May to September 1973. The main variable of interest is **Ozone** (ppb). Other variables include **Solar.R** (solar radiation in Langley), **Wind** (mph), **Temp** (Fahrenheit), and the **Month** and **Day** of the observation. Some values are missing (e.g. Ozone and Solar.R).
+The `airquality` dataset provides daily air quality measurements in New York City from May to September 1973. The main variable of interest is Ozone (ppb). Other variables include Solar (solar radiation in Langley), Wind (mph), Temp (Fahrenheit), and the Month and Day of the observation. Some values are missing (e.g. Ozone and Solar.R).
 
 ```{r preview}
 knitr::kable(utils::head(df, 6), caption = "First six rows of the airquality dataset")
@@ -25,7 +25,7 @@ knitr::kable(utils::head(df, 6), caption = "First six rows of the airquality dat
 
 ## 2. Research question
 
-> **How does temperature influence ozone concentration, and are there seasonal (monthly) patterns in ozone levels?**
+> How does temperature influence ozone concentration, and are there seasonal (monthly) patterns in ozone levels?
 
 ## 3. Statistical metrics
 
@@ -52,7 +52,7 @@ knitr::kable(summary_stats, caption = "Basic statistics on Ozone and Temperature
 
 ```{r boxplot-month}
 ggplot2::ggplot(df, ggplot2::aes(x = factor(Month), y = Ozone)) +
-  ggplot2::geom_boxplot(fill = "#FFCC80", color = "#FF6F00", na.rm = TRUE) +
+  ggplot2::geom_boxplot(fill = "indianred2", color = "indianred4", na.rm = TRUE) +
   ggplot2::labs(title = "Monthly distribution of ozone concentration",
                 x = "Month (May to September)", y = "Ozone (ppb)") +
   ggplot2::theme_minimal()
@@ -62,8 +62,8 @@ ggplot2::ggplot(df, ggplot2::aes(x = factor(Month), y = Ozone)) +
 
 ```{r scatter-temp-ozone}
 ggplot2::ggplot(df_clean, ggplot2::aes(x = Temp, y = Ozone)) +
-  ggplot2::geom_point(color = "#1565C0", alpha = 0.7) +
-  ggplot2::geom_smooth(method = "lm", se = FALSE, color = "darkred") +
+  ggplot2::geom_point(color = "indianred2", alpha = 0.7) +
+  ggplot2::geom_smooth(method = "lm", se = FALSE, color = "indianred4") +
   ggplot2::labs(title = "Relationship between temperature and ozone",
                 x = "Temperature (°F)", y = "Ozone (ppb)") +
   ggplot2::theme_light()
@@ -77,7 +77,7 @@ df_date <- df %>%
   dplyr::mutate(date = base::as.Date(paste(1973, Month, Day, sep = "-")))
 
 ggplot2::ggplot(df_date, ggplot2::aes(x = date, y = Ozone)) +
-  ggplot2::geom_line(color = "#43A047") +
+  ggplot2::geom_line(color = "indianred4") +
   ggplot2::labs(title = "Ozone concentration over time",
                 x = "Date", y = "Ozone (ppb)") +
   ggplot2::theme_minimal()
