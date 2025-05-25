@@ -1,0 +1,197 @@
+---
+title: "Report Exercise Chapter 10"
+author: "Emma Biland"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tidyr)
+library(caret)
+library(recipes)
+library(rsample)
+library(yardstick)
+library(cowplot)
+```
+
+## 1. Introduction
+
+This report compares the performance of a linear regression model and a K-Nearest Neighbors (KNN) model for predicting daily gross primary production (GPP) using meteorological covariates. The analysis follows the AGDS workflow and investigates the bias-variance trade-off through model comparison and exploration of the parameter *k* in KNN.
+
+## 2. Data Preparation and Preprocessing
+
+### 2.1 Load and clean data
+
+```{r data preparation}
+daily_fluxes <- read_csv(here::here("data", "FLX_CH-Dav_FLUXNET2015_FULLSET_DD_1997-2014_1-3.csv")) |>  
+  select(
+    TIMESTAMP,
+    GPP_NT_VUT_REF,
+    ends_with("_QC"),
+    ends_with("_F"),
+    -contains("JSB")
+  ) |> 
+  mutate(
+    TIMESTAMP = lubridate::ymd(TIMESTAMP),
+    across(where(is.numeric), ~na_if(., -9999))
+  ) |> 
+  mutate(
+    GPP_NT_VUT_REF = ifelse(NEE_VUT_REF_QC < 0.8, NA, GPP_NT_VUT_REF),
+    TA_F           = ifelse(TA_F_QC        < 0.8, NA, TA_F),
+    SW_IN_F        = ifelse(SW_IN_F_QC     < 0.8, NA, SW_IN_F),
+    LW_IN_F        = ifelse(LW_IN_F_QC     < 0.8, NA, LW_IN_F),
+    VPD_F          = ifelse(VPD_F_QC       < 0.8, NA, VPD_F),
+    PA_F           = ifelse(PA_F_QC        < 0.8, NA, PA_F),
+    P_F            = ifelse(P_F_QC         < 0.8, NA, P_F),
+    WS_F           = ifelse(WS_F_QC        < 0.8, NA, WS_F)
+  ) |> 
+  select(-ends_with("_QC"))
+```
+
+### 2.2 Split data into training and test sets
+
+```{r data split}
+set.seed(123)
+split <- initial_split(daily_fluxes, prop = 0.7, strata = "VPD_F")
+daily_fluxes_train <- training(split)
+daily_fluxes_test <- testing(split)
+```
+
+### 2.3 Define preprocessing recipe
+
+```{r data preprocessing}
+pp <- recipe(GPP_NT_VUT_REF ~ SW_IN_F + VPD_F + TA_F, data = daily_fluxes_train |> drop_na()) |> 
+  step_center(all_numeric(), -all_outcomes()) |>
+  step_scale(all_numeric(), -all_outcomes())
+```
+
+## 3. Model Training and Evaluation
+
+### 3.1 Fit linear regression and KNN models
+
+```{r train models}
+mod_lm <- train(
+  pp, 
+  data = daily_fluxes_train |> drop_na(), 
+  method = "lm",
+  trControl = trainControl(method = "none"),
+  metric = "RMSE"
+)
+
+mod_knn <- train(
+  pp, 
+  data = daily_fluxes_train |> drop_na(), 
+  method = "knn",
+  trControl = trainControl(method = "none"),
+  tuneGrid = data.frame(k = 8),
+  metric = "RMSE"
+)
+```
+
+### 3.2 Load evaluation function
+
+```{r load evaluation model}
+source(here::here("analysis", "eval_model.R"))
+```
+
+### 3.3 Evaluate models
+
+```{r model evaluation}
+eval_model(mod = mod_lm, df_train = daily_fluxes_train, df_test = daily_fluxes_test)
+eval_model(mod = mod_knn, df_train = daily_fluxes_train, df_test = daily_fluxes_test)
+```
+
+## 4. Interpretation: Bias-Variance Trade-off
+
+### 4.1 Training and test performance
+
+**Why is the difference between the evaluation on the training and the test set larger for the KNN model than for the linear regression model?**
+
+The difference is larger for the KNN model because KNN is a flexible, non-parametric method that can closely adapt to the training data, including its noise and idiosyncrasies. This means it often achieves a very low training error. However, this flexibility comes at the cost of increased variance: the model may not generalize well to new data, resulting in a higher error on the test set. In contrast, linear regression is a more constrained model that assumes a fixed linear relationship. It cannot fit the training data as tightly, leading to higher training error, but it tends to generalize better, producing a smaller difference between training and test performance.
+
+**Why does the evaluation on the test set indicate a better model performance of the KNN model than the linear regression model?**
+
+Although KNN has a higher variance, in this specific case, it appears to capture important non-linear relationships in the data that the linear regression model cannot. As a result, the KNN model makes more accurate predictions on the test set, achieving a lower error. This suggests that the data-generating process contains structures that benefit from a more flexible model, and that in this case the reduction in bias (thanks to KNN's adaptability) outweighs the increase in variance.
+
+**How would you position the KNN and the linear regression model along the spectrum of the bias-variance trade-off?**
+
+KNN is positioned on the low-bias, high-variance end of the bias-variance trade-off spectrum. It is highly flexible and can capture complex relationships, but it is also sensitive to noise and to the specific composition of the training set. On the other hand, linear regression sits on the high-bias, low-variance end. It imposes a strict linear structure, which may not align well with the true data pattern, but its simplicity ensures that its predictions are more stable across different datasets.
+
+## 5. Visualisation of Model Predictions Over Time
+
+```{r temporal visualisation}
+prep_pp <- prep(pp, training = daily_fluxes_train |> drop_na())
+
+daily_fluxes_clean <- daily_fluxes |> drop_na()
+daily_fluxes_full <- bake(prep_pp, new_data = daily_fluxes_clean)
+
+daily_fluxes_full$TIMESTAMP <- daily_fluxes_clean$TIMESTAMP
+daily_fluxes_full$GPP_NT_VUT_REF <- daily_fluxes_clean$GPP_NT_VUT_REF
+
+daily_fluxes_full$pred_lm <- predict(mod_lm, newdata = daily_fluxes_full)
+daily_fluxes_full$pred_knn <- predict(mod_knn, newdata = daily_fluxes_full)
+
+plot_data <- daily_fluxes_full |> 
+  select(TIMESTAMP, GPP_NT_VUT_REF, pred_lm, pred_knn) |> 
+  pivot_longer(cols = c(GPP_NT_VUT_REF, pred_lm, pred_knn),
+               names_to = "variable", values_to = "value")
+
+ggplot(plot_data, aes(x = TIMESTAMP, y = value, colour = variable)) +
+  geom_line(alpha = 0.8) +
+  labs(title = "Observed and Modelled GPP over Time",
+       y = "GPP (µmol m⁻² s⁻¹)", x = "Date") +
+  scale_colour_manual(values = c("palegreen4", "cadetblue3", "indianred3"),
+                      labels = c("Observed", "Linear model", "KNN")) +
+  theme_minimal()
+```
+
+## 6. Exploring the Role of *k* in KNN
+
+### 6.1 Hypothesis
+
+When *k* is close to 1, the KNN model becomes highly flexible and fits the training data very closely. This leads to a very low training error (high \(R^2\), low MAE), but poor generalisation to new data, due to high variance. Conversely, when *k* approaches *N* (the total number of observations), the model becomes overly smooth and fails to capture any local patterns. This results in higher bias and underfitting, leading to poor performance both on the training and the test set. Based on the bias-variance trade-off, we expect the best generalisation at an intermediate value of *k*, where variance and bias are balanced.
+
+### 6.2 Evaluation loop for different *k*
+
+```{r eval-k-loop}
+get_test_mae <- function(k_value) {
+  model <- caret::train(
+    pp,
+    data = daily_fluxes_train |> drop_na(),
+    method = "knn",
+    tuneGrid = data.frame(k = k_value),
+    trControl = caret::trainControl(method = "none")
+  )
+  test_data <- daily_fluxes_test |> drop_na()
+  preds <- predict(model, newdata = test_data)
+  truth <- test_data$GPP_NT_VUT_REF
+  yardstick::mae_vec(truth, preds)
+}
+
+k_values <- seq(1, 50, by = 2)
+mae_values <- sapply(k_values, get_test_mae)
+
+tibble(k = k_values, MAE = mae_values) |> 
+  ggplot(aes(x = k, y = MAE)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "black") +
+  labs(title = "Test MAE as a Function of k in KNN",
+       x = "k (number of neighbours)", y = "Mean Absolute Error (MAE)") +
+  theme_minimal()
+```
+
+### 6.3 Interpretation
+
+The plot confirms the expected U-shaped relationship between model complexity (through *k*) and generalisation error. When *k* is small (e.g. *k* = 1), the KNN model is extremely flexible and fits the training data very closely, resulting in overfitting. This leads to a high mean absolute error (MAE) on the test set.
+As *k* increases, the model becomes less sensitive to noise in the training data, and the MAE on the test set decreases. This indicates improved generalisation. The lowest MAE is observed around *k* = 25 to 30, which suggests this range represents an optimal trade-off between bias and variance.
+Beyond *k* = 30, the test MAE increases slightly again, which suggests that the model begins to underfit the data: its predictions become overly smoothed, losing important local variation. This highlights the classic bias-variance trade-off in supervised learning and supports the idea that an intermediate value of *k* offers the best model performance.
+
+
+## Conclusion
+This analysis highlights the importance of the *k* parameter in the KNN model, illustrating the trade-off between bias and variance. Choosing an appropriate value for *k* helps improve model performance while avoiding underfitting or overfitting.
