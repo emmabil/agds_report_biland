@@ -97,7 +97,7 @@ mod_knn <- train(
 ### 3.2 Load evaluation function
 
 ```{r load evaluation model}
-source(here::here("analysis", "eval_model.R"))
+source(here::here("function", "eval_model.R"))
 ```
 
 ### 3.3 Evaluate models
